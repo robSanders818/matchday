@@ -3,97 +3,110 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: a single-column matchday team sheet: scoreline up top, your XI by slot, bench, then the opponent and the kickoff board. */
+/* Layout: a compact single-column matchday sheet: scoreboard (one row per team), your XI grouped F/M/D/GK, bench, opponent, kickoffs. */
 :root {
   --paper: #f3f4f1;
   --sheet: #ffffff;
   --ink: #18222e;
   --muted: #5e6a75;
-  --rule: #d9ddd8;
+  --rule: #e1e4df;
   --claret: #7a1f3d;
-  --claret-soft: #f3e3e9;
   --good: #1f7a4a;
   --good-soft: #def2e6;
   --warn: #9a6400;
   --warn-soft: #fbefd6;
   --bad: #b3261e;
   --bad-soft: #fbe2df;
+  /* Position colours: forwards red, midfield green, defence blue, keeper amber. */
+  --pos-f: #c0392b; --pos-f-soft: #fbe4e1;
+  --pos-m: #23824f; --pos-m-soft: #ddf1e5;
+  --pos-d: #2563a8; --pos-d-soft: #e0ebf8;
+  --pos-gk: #a86a00; --pos-gk-soft: #f8ecd2;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #10161d; --sheet: #18212b; --ink: #e8ecef; --muted: #9aa7b3; --rule: #2a3542;
-    --claret: #e27a9b; --claret-soft: #3a1d29; --good: #6fd29b; --good-soft: #173527;
-    --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a; color-scheme: dark;
+    --claret: #e27a9b; --good: #6fd29b; --good-soft: #173527;
+    --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a;
+    --pos-f: #ff8f80; --pos-f-soft: #3d1f1c; --pos-m: #72d69c; --pos-m-soft: #183324;
+    --pos-d: #7fb3f0; --pos-d-soft: #19293d; --pos-gk: #f2c063; --pos-gk-soft: #392b12;
+    color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #10161d; --sheet: #18212b; --ink: #e8ecef; --muted: #9aa7b3; --rule: #2a3542;
-  --claret: #e27a9b; --claret-soft: #3a1d29; --good: #6fd29b; --good-soft: #173527;
-  --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a; color-scheme: dark;
+  --claret: #e27a9b; --good: #6fd29b; --good-soft: #173527;
+  --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a;
+  --pos-f: #ff8f80; --pos-f-soft: #3d1f1c; --pos-m: #72d69c; --pos-m-soft: #183324;
+  --pos-d: #7fb3f0; --pos-d-soft: #19293d; --pos-gk: #f2c063; --pos-gk-soft: #392b12;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { margin: 0; }
-body { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
-body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; }
-.wrap { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: grid; gap: 20px; }
-h1, h2 { font-family: var(--display); font-weight: 600; letter-spacing: .02em; margin: 0; text-wrap: balance; }
-h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+body { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.35; }
+.wrap { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 32px; display: grid; gap: 14px; }
+h2 { font-family: var(--display); font-weight: 600; margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
 .num { font-variant-numeric: tabular-nums; }
 
-.score { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
-.mw { font-family: var(--display); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--claret); font-weight: 700; }
-.line { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; }
-.side { min-width: 0; display: grid; gap: 2px; }
-.side.r { text-align: right; }
-.tname { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
-.pts { font-family: var(--display); font-size: 44px; font-weight: 700; line-height: 1; }
-.dash { font-family: var(--display); font-size: 28px; color: var(--muted); padding-bottom: 4px; }
-select { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; max-width: 100%; justify-self: end; }
-.winbar { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+.score { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.mw { font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--claret); font-weight: 700; }
+.team { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.tname { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pts { font-family: var(--display); font-size: 28px; font-weight: 700; line-height: 1; }
+select { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 3px 6px; width: 100%; min-width: 0; text-overflow: ellipsis; }
+.winbar { height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
 .winbar > div { height: 100%; background: var(--claret); }
-.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); align-items: center; }
 .meta b { color: var(--ink); font-weight: 600; }
 
-.alert { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; display: grid; gap: 4px; }
+.alert { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 9px 12px; font-size: 13px; display: grid; gap: 3px; }
 .alert strong { color: var(--warn); }
 
 .sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
-.row { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--rule); }
+.row { box-shadow: inset 3px 0 0 var(--pos, transparent); display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 12px; border-top: 1px solid var(--rule); }
 .row:first-child { border-top: 0; }
-.slot { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .06em; color: var(--claret); }
-.slot small { display: block; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
-.who { min-width: 0; display: grid; gap: 3px; }
-.pname { font-weight: 600; overflow-wrap: anywhere; }
-.sub { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
-.right { display: grid; justify-items: end; gap: 4px; }
-.pp { font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1; }
-.chip { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--paper); color: var(--muted); border: 1px solid var(--rule); white-space: nowrap; }
+.slot { display: grid; justify-items: center; gap: 2px; }
+.badge { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .04em; width: 34px; text-align: center;
+  padding: 3px 0; border-radius: 5px; color: var(--sheet); background: var(--pos); }
+.slot small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.pos-F { --pos: var(--pos-f); --pos-soft: var(--pos-f-soft); }
+.pos-M { --pos: var(--pos-m); --pos-soft: var(--pos-m-soft); }
+.pos-D { --pos: var(--pos-d); --pos-soft: var(--pos-d-soft); }
+.pos-GK { --pos: var(--pos-gk); --pos-soft: var(--pos-gk-soft); }
+.who { min-width: 0; display: grid; gap: 2px; }
+.pname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
+.right { display: grid; justify-items: end; gap: 3px; }
+.pp { font-family: var(--display); font-size: 20px; font-weight: 700; line-height: 1; }
+.chip { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: var(--paper); color: var(--muted); border: 1px solid var(--rule); white-space: nowrap; }
 .chip.start { background: var(--good-soft); color: var(--good); border-color: transparent; }
-.chip.bench { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.bench, .chip.gtd { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .chip.out { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
-.chip.gtd { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
-button.tog { font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+button.tog { font: inherit; font-size: 11px; font-weight: 600; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 3px 7px; cursor: pointer; }
 button.tog[data-o="start"] { border-color: var(--good); color: var(--good); }
 button.tog[data-o="out"] { border-color: var(--bad); color: var(--bad); }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--claret); outline-offset: 2px; }
-.row.benchrow .slot { color: var(--muted); }
-.locked { opacity: .75; }
+.benchrow .pname { font-weight: 500; }
+.locked { opacity: .7; }
 
 details > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: baseline; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::after { content: "Show"; font-size: 13px; color: var(--claret); font-weight: 600; }
+details > summary::after { content: "Show"; font-size: 12px; color: var(--claret); font-weight: 600; }
 details[open] > summary::after { content: "Hide"; }
-.sec { display: grid; gap: 8px; }
-.ko { display: grid; grid-template-columns: 88px 1fr auto; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--rule); font-size: 14px; align-items: center; }
+.sec { display: grid; gap: 6px; }
+.ko { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--rule); font-size: 13px; align-items: center; }
 .ko:first-child { border-top: 0; }
-.help { font-size: 13px; color: var(--muted); max-width: 62ch; }
-.foot { font-size: 12px; color: var(--muted); }
+.help { font-size: 12px; color: var(--muted); margin: 0; }
+.foot { font-size: 11.5px; color: var(--muted); margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-input[type=password] { font: inherit; font-size: 16px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }
-button.primary { font-size: 15px; padding: 10px 12px; background: var(--claret); color: var(--sheet); border-color: var(--claret); }
+input[type=password] { font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }
+button.primary { font-size: 15px; padding: 9px 12px; background: var(--claret); color: var(--sheet); border-color: var(--claret); }
 </style>
 
 <div class="wrap">
@@ -105,13 +118,10 @@ button.primary { font-size: 15px; padding: 10px 12px; background: var(--claret);
     <button class="tog primary" type="submit">Unlock</button>
     <span class="help" id="unlockMsg" role="status"></span>
   </form>
-  <section class="score" id="scoreCard" hidden aria-label="Projected score" aria-label="Projected score">
+  <section class="score" id="scoreCard" hidden aria-label="Projected score">
     <div class="mw" id="mw"></div>
-    <div class="line">
-      <div class="side"><span class="tname" id="myname"></span><span class="pts num" id="mypts"></span></div>
-      <span class="dash">–</span>
-      <div class="side r"><select id="opp" aria-label="Opponent"></select><span class="pts num" id="oppts"></span></div>
-    </div>
+    <div class="team"><span class="tname" id="myname"></span><span class="pts num" id="mypts"></span></div>
+    <div class="team"><select id="opp" aria-label="Opponent"></select><span class="pts num" id="oppts"></span></div>
     <div class="winbar" aria-hidden="true"><div id="winfill"></div></div>
     <div class="meta"><span>Win chance <b id="winp"></b></span><span id="lineupsKnown"></span><span id="sleeperNote"></span></div>
     <div class="meta" id="liveRow" hidden><span id="liveMsg" role="status"></span><button class="tog" type="button" id="refresh">Check lineups now</button></div>
@@ -123,7 +133,7 @@ button.primary { font-size: 15px; padding: 10px 12px; background: var(--claret);
   <section class="sec main" hidden>
     <h2>Your XI</h2>
     <div class="sheet" id="xi"></div>
-    <p class="help">Tap the button on a player to cycle <b>Auto</b> → <b>Starting</b> → <b>Out</b>. The lineup and win chance update right away. A lock means that game has kicked off and Sleeper has locked it. Dual-position players show both positions under the slot they fill.</p>
+    <p class="help">Tap the button on a player to cycle <b>Auto</b> → <b>Starting</b> → <b>Out</b>. The lineup and win chance update right away. A lock means that game has kicked off and Sleeper has locked it. Dual-position players show both positions under the badge.</p>
   </section>
 
   <section class="sec main" hidden>
@@ -180,8 +190,8 @@ async function loadEncrypted(pass) {
 }
 
 // ---------- ESPN lineups ----------
-const norm = s => (s || "").replace(/ß/g, "ss").replace(/ø/g, "o").replace(/ł/g, "l").normalize("NFKD")
-  .replace(/[̀-ͯ]/g, "").toLowerCase().replace(/-/g, " ").trim();
+const norm = s => (s || "").replace(/\u00df/g, "ss").replace(/\u00f8/g, "o").replace(/\u0142/g, "l").normalize("NFKD")
+  .replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/-/g, " ").trim();
 function lineupStatus(name, squad) {
   if (!squad || !squad.length) return null;
   const n = norm(name), last = n.split(" ").pop();
@@ -247,7 +257,8 @@ function proj(p) {
   return p.proj;
 }
 // Best goalkeeper + best formation/assignment of outfielders by eligibility (exact DP over position counts).
-const OUTFIELD = ["D", "M", "F"];
+const OUTFIELD = ["D", "M", "F"];       // formation order, e.g. 3-4-3 = 3 D, 4 M, 3 F
+const SHOW = ["F", "M", "D", "GK"];      // display order
 const elig = p => (p.elig && p.elig.length ? p.elig : [p.pos]);
 function bestLineup(rid) {
   const pool = DATA.players.filter(p => p.rid === rid && !p.ir).map(p => ({ p, v: proj(p) }));
@@ -274,9 +285,9 @@ function bestLineup(rid) {
     const st = k.split(",").map(Number);
     if (st.every((n, i) => n <= f[i]) && c.t > best.t) best = c;
   }
-  const lineup = best.lu.slice().sort((a, b) => OUTFIELD.indexOf(a.slot) - OUTFIELD.indexOf(b.slot) || b.v - a.v);
+  const lineup = best.lu.slice().sort((a, b) => SHOW.indexOf(a.slot) - SHOW.indexOf(b.slot) || b.v - a.v);
   let total = best.t;
-  if (gk) { lineup.unshift({ slot: "GK", ...gk }); total += gk.v; }
+  if (gk) { lineup.push({ slot: "GK", ...gk }); total += gk.v; }
   return { total, lineup };
 }
 const formationOf = lineup => OUTFIELD.map(pos => lineup.filter(x => x.slot === pos).length).join("-");
@@ -295,12 +306,13 @@ function chip(p) {
 function rowHtml(x, slot, editable, bench) {
   const p = x.p, v = x.v;
   const dual = elig(p).length > 1 ? elig(p).join("/") : "";
-  const sl = slot ? `${slot}<small>${dual || "&nbsp;"}</small>` : `${elig(p).join("/")}<small>bench</small>`;
+  const shown = slot || p.pos;
+  const sl = `<span class="badge pos-${shown}">${shown}</span>${dual ? `<small>${dual}</small>` : ""}`;
   const venue = p.home == null ? "" : p.home ? "home" : "away";
   const cs = p.pcs != null ? ` · CS ${Math.round(p.pcs * 100)}%` : "";
   const o = overrides[p.pid] || "";
   const btn = editable ? `<button class="tog" type="button" data-pid="${p.pid}" data-o="${o}" aria-label="Change status for ${esc(p.name)}">${o === "start" ? "Starting" : o === "out" ? "Out" : "Auto"}</button>` : "";
-  return `<div class="row${bench ? " benchrow" : ""}${locked(p) ? " locked" : ""}">
+  return `<div class="row pos-${slot || p.pos}${bench ? " benchrow" : ""}${locked(p) ? " locked" : ""}">
     <div class="slot">${sl}</div>
     <div class="who"><span class="pname">${locked(p) ? "🔒 " : ""}${esc(p.name)}</span>
       <span class="sub"><span>${esc(p.team || "—")} v ${esc(p.opp || "—")} ${venue}${cs}</span><span>${fmtKo(p.kickoff)}</span>${chip(p)}</span></div>
@@ -331,7 +343,8 @@ function render() {
 
   $("xi").innerHTML = mine.lineup.map(x => rowHtml(x, x.slot, true)).join("");
   const starters = new Set(mine.lineup.map(x => x.p.pid));
-  const bench = DATA.players.filter(p => p.rid === DATA.me && !starters.has(p.pid)).sort((a, b) => proj(b) - proj(a));
+  const bench = DATA.players.filter(p => p.rid === DATA.me && !starters.has(p.pid))
+    .sort((a, b) => SHOW.indexOf(a.pos) - SHOW.indexOf(b.pos) || proj(b) - proj(a));
   $("bench").innerHTML = bench.map(p => rowHtml({ p, v: proj(p) }, null, true, true)).join("");
   $("oppTitle").textContent = `${teamName(oppRid)} XI · ${formationOf(theirs.lineup)}`;
   $("oppxi").innerHTML = theirs.lineup.map(x => rowHtml(x, x.slot, false)).join("");

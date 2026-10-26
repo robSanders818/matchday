@@ -24,6 +24,7 @@ import model
 # A player can fill any position he's eligible for (e.g. Okafor F or M); he's scored the same either way.
 FORMATIONS = [(3, 4, 3), (3, 5, 2), (4, 3, 3), (4, 4, 2), (4, 5, 1), (5, 3, 2), (5, 4, 1)]
 OUTFIELD = ("D", "M", "F")
+SHOW = ("F", "M", "D", "GK")   # display order
 ROS_WEEKS = 5
 PLAYER_SD = 6.0        # typical miss on one player's matchweek score (backtest MAE ~5.3)
 
@@ -68,10 +69,10 @@ def best_lineup(pids: list[str], p: pd.DataFrame) -> tuple[float, list[tuple[str
             if all(st[i] <= f[i] for i in range(3)) and cand[0] > best[0]:
                 best = cand
     total, lineup = best
-    lineup = sorted(lineup, key=lambda x: (OUTFIELD.index(x[0]), -val[x[1]]))
+    lineup = sorted(lineup, key=lambda x: (SHOW.index(x[0]), -val[x[1]]))
     if gks:
         total += val[gks[0]]
-        lineup = [("GK", gks[0])] + lineup
+        lineup = lineup + [("GK", gks[0])]
     return total, lineup
 
 

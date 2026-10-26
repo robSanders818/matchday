@@ -154,7 +154,8 @@ def report(data: dict, out) -> None:
     empty = sum(1 for x in saved if x in ("0", "", None))
     dead = [by[x]["name"] for x in saved if x in by and adjusted(by[x]) == 0]
     if empty or dead:
-        print(f"  !! Your saved Sleeper lineup has {empty} empty slot(s)" + (f" and starts {', '.join(dead)} (not playing)" if dead else ""))
+        issues = ([f"{empty} empty slot(s)"] if empty else []) + ([f"starts {', '.join(dead)} (not playing)"] if dead else [])
+        print("  !! Your saved Sleeper lineup: " + "; ".join(issues))
     last = out / "last_xi.json"
     prev = json.loads(last.read_text()) if last.exists() else {}
     if prev.get("week") == data["week"]:

@@ -62,6 +62,13 @@ def encrypt(plain: bytes, pw: str) -> bytes:
     return MAGIC + salt + iv + AESGCM(key).encrypt(iv, gzip.compress(plain, 9), None)
 
 
+def write_index():
+    (SITE / "index.html").write_text("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n"
+                                     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
+                                     "<meta name=\"robots\" content=\"noindex\">\n</head><body>\n"
+                                     + (ROOT / "web" / "matchday.template.html").read_text() + "\n</body></html>\n")
+
+
 def git(*a, check=True):
     return subprocess.run(["git", *a], cwd=SITE, check=check, capture_output=True, text=True)
 
@@ -103,10 +110,7 @@ def main():
     data = json.loads((ROOT / "out" / "matchday.json").read_text())
     pw = passphrase(a.new_passphrase)
     (SITE / "data").mkdir(parents=True, exist_ok=True)
-    (SITE / "index.html").write_text("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n"
-                                     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-                                     "<meta name=\"robots\" content=\"noindex\">\n</head><body>\n"
-                                     + (ROOT / "web" / "matchday.template.html").read_text() + "\n</body></html>\n")
+    write_index()
     (SITE / "data" / "matchday.drs").write_bytes(encrypt(json.dumps(data, separators=(",", ":")).encode(), pw))
     (SITE / ".nojekyll").write_text("")
     print(f"wrote {SITE}/index.html and data/matchday.drs")
