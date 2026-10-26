@@ -1,0 +1,396 @@
+<title>Kitties Matchday</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single-column matchday team sheet: scoreline up top, your XI by slot, bench, then the opponent and the kickoff board. */
+:root {
+  --paper: #f3f4f1;
+  --sheet: #ffffff;
+  --ink: #18222e;
+  --muted: #5e6a75;
+  --rule: #d9ddd8;
+  --claret: #7a1f3d;
+  --claret-soft: #f3e3e9;
+  --good: #1f7a4a;
+  --good-soft: #def2e6;
+  --warn: #9a6400;
+  --warn-soft: #fbefd6;
+  --bad: #b3261e;
+  --bad-soft: #fbe2df;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10161d; --sheet: #18212b; --ink: #e8ecef; --muted: #9aa7b3; --rule: #2a3542;
+    --claret: #e27a9b; --claret-soft: #3a1d29; --good: #6fd29b; --good-soft: #173527;
+    --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10161d; --sheet: #18212b; --ink: #e8ecef; --muted: #9aa7b3; --rule: #2a3542;
+  --claret: #e27a9b; --claret-soft: #3a1d29; --good: #6fd29b; --good-soft: #173527;
+  --warn: #f0b94f; --warn-soft: #3a2d12; --bad: #ff8a80; --bad-soft: #3d1c1a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.4; }
+.wrap { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--display); font-weight: 600; letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+.score { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.mw { font-family: var(--display); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--claret); font-weight: 700; }
+.line { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8px; }
+.side { min-width: 0; display: grid; gap: 2px; }
+.side.r { text-align: right; }
+.tname { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.pts { font-family: var(--display); font-size: 44px; font-weight: 700; line-height: 1; }
+.dash { font-family: var(--display); font-size: 28px; color: var(--muted); padding-bottom: 4px; }
+select { font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; max-width: 100%; justify-self: end; }
+.winbar { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+.winbar > div { height: 100%; background: var(--claret); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+.alert { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; display: grid; gap: 4px; }
+.alert strong { color: var(--warn); }
+
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.row { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--rule); }
+.row:first-child { border-top: 0; }
+.slot { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .06em; color: var(--claret); }
+.slot small { display: block; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+.who { min-width: 0; display: grid; gap: 3px; }
+.pname { font-weight: 600; overflow-wrap: anywhere; }
+.sub { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.right { display: grid; justify-items: end; gap: 4px; }
+.pp { font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1; }
+.chip { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--paper); color: var(--muted); border: 1px solid var(--rule); white-space: nowrap; }
+.chip.start { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.chip.bench { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.chip.out { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.chip.gtd { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+button.tog { font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+button.tog[data-o="start"] { border-color: var(--good); color: var(--good); }
+button.tog[data-o="out"] { border-color: var(--bad); color: var(--bad); }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--claret); outline-offset: 2px; }
+.row.benchrow .slot { color: var(--muted); }
+.locked { opacity: .75; }
+
+details > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: baseline; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::after { content: "Show"; font-size: 13px; color: var(--claret); font-weight: 600; }
+details[open] > summary::after { content: "Hide"; }
+.sec { display: grid; gap: 8px; }
+.ko { display: grid; grid-template-columns: 88px 1fr auto; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--rule); font-size: 14px; align-items: center; }
+.ko:first-child { border-top: 0; }
+.help { font-size: 13px; color: var(--muted); max-width: 62ch; }
+.foot { font-size: 12px; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+input[type=password] { font: inherit; font-size: 16px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }
+button.primary { font-size: 15px; padding: 10px 12px; background: var(--claret); color: var(--sheet); border-color: var(--claret); }
+</style>
+
+<div class="wrap">
+  <form class="score" id="unlock" hidden>
+    <div class="mw">Kitties Matchday</div>
+    <p class="help">Enter your matchday passphrase. It's saved on this phone so you only type it once.</p>
+    <label class="sr" for="pass">Passphrase</label>
+    <input type="password" id="pass" autocomplete="current-password" placeholder="Passphrase" required>
+    <button class="tog primary" type="submit">Unlock</button>
+    <span class="help" id="unlockMsg" role="status"></span>
+  </form>
+  <section class="score" id="scoreCard" hidden aria-label="Projected score" aria-label="Projected score">
+    <div class="mw" id="mw"></div>
+    <div class="line">
+      <div class="side"><span class="tname" id="myname"></span><span class="pts num" id="mypts"></span></div>
+      <span class="dash">–</span>
+      <div class="side r"><select id="opp" aria-label="Opponent"></select><span class="pts num" id="oppts"></span></div>
+    </div>
+    <div class="winbar" aria-hidden="true"><div id="winfill"></div></div>
+    <div class="meta"><span>Win chance <b id="winp"></b></span><span id="lineupsKnown"></span><span id="sleeperNote"></span></div>
+    <div class="meta" id="liveRow" hidden><span id="liveMsg" role="status"></span><button class="tog" type="button" id="refresh">Check lineups now</button></div>
+  </section>
+
+  <div class="alert" id="changes" hidden></div>
+
+  <section class="sec main" hidden>
+    <h2>Your XI</h2>
+    <div class="sheet" id="xi"></div>
+    <p class="help">Tap the button on a player to cycle <b>Auto</b> → <b>Starting</b> → <b>Out</b>. The lineup and win chance update right away. A lock means that game has kicked off and Sleeper has locked it.</p>
+  </section>
+
+  <section class="sec main" hidden>
+    <h2>Bench</h2>
+    <div class="sheet" id="bench"></div>
+  </section>
+
+  <details class="sec main" id="oppSec" hidden>
+    <summary><h2 id="oppTitle">Their XI</h2></summary>
+    <div class="sheet" id="oppxi"></div>
+  </details>
+
+  <details class="sec main" hidden>
+    <summary><h2>Kickoffs</h2></summary>
+    <div class="sheet" id="kos"></div>
+  </details>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+// Data comes embedded (artifact build) or as an encrypted file next to the page (GitHub Pages):
+//   data/matchday.drs = "DRS1" | salt(16) | iv(12) | AES-256-GCM(gzip(json)), key = PBKDF2-SHA256(passphrase)
+// On GitHub Pages the page also reads confirmed lineups straight from ESPN.
+let DATA = /*DATA*/null;
+const DATA_URL = "data/matchday.drs";
+const ITERATIONS = 310000;  // must match publish.py
+const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1";
+const ESPN_TO_SLEEPER = { MNC: "MCI", MAN: "MUN" };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+// ---------- crypto ----------
+const gunzip = buf => new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+async function decrypt(buf, pass) {
+  const b = new Uint8Array(buf);
+  if (new TextDecoder().decode(b.slice(0, 4)) !== "DRS1") throw new Error("That isn't a matchday data file.");
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b.slice(4, 20), iterations: ITERATIONS, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  let gz;
+  try { gz = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.slice(20, 32) }, key, b.slice(32)); }
+  catch (e) { throw new Error("Wrong passphrase. Try again."); }
+  return JSON.parse(new TextDecoder().decode(await gunzip(gz)));
+}
+async function loadEncrypted(pass) {
+  const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" }).catch(() => null);
+  if (!res || !res.ok) throw new Error("Couldn't download the projections. Check your connection and reload.");
+  return decrypt(await res.arrayBuffer(), pass);
+}
+
+// ---------- ESPN lineups ----------
+const norm = s => (s || "").replace(/ß/g, "ss").replace(/ø/g, "o").replace(/ł/g, "l").normalize("NFKD")
+  .replace(/[̀-ͯ]/g, "").toLowerCase().replace(/-/g, " ").trim();
+function lineupStatus(name, squad) {
+  if (!squad || !squad.length) return null;
+  const n = norm(name), last = n.split(" ").pop();
+  let hit = squad.filter(x => x.name === n);
+  if (!hit.length) { hit = squad.filter(x => x.last === last || x.name.split(" ").pop() === last); if (hit.length !== 1) hit = []; }
+  if (!hit.length) { const t = new Set(n.split(" ")); hit = squad.filter(x => x.name.split(" ").some(w => t.has(w))); if (hit.length !== 1) hit = []; }
+  if (!hit.length) return squad.length >= 18 ? "out" : null;
+  return hit[0].starter ? "start" : "bench";
+}
+const getJson = url => fetch(url, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+async function liveLineups() {
+  const days = [...new Set(DATA.matches.map(m => m.kickoff.slice(0, 10).replace(/-/g, "")))];
+  const events = new Map();
+  for (const d of days) for (const e of (await getJson(`${ESPN}/scoreboard?dates=${d}`)).events || []) events.set(e.id, e);
+  const byTeam = {};
+  await Promise.all([...events.values()].map(async e => {
+    const comp = e.competitions[0];
+    const t = {}; comp.competitors.forEach(c => t[c.homeAway] = ESPN_TO_SLEEPER[c.team.abbreviation] || c.team.abbreviation);
+    const m = { kickoff: e.date, home: t.home, away: t.away, status: comp.status.type.name, squads: {} };
+    // Lineups appear about an hour before kickoff; don't bother asking earlier than 90 minutes out.
+    if (new Date(e.date).getTime() - Date.now() < 90 * 60000) {
+      try {
+        for (const r of (await getJson(`${ESPN}/summary?event=${e.id}`)).rosters || []) {
+          if (r.roster && r.roster.length) m.squads[ESPN_TO_SLEEPER[r.team.abbreviation] || r.team.abbreviation] =
+            r.roster.map(x => ({ name: norm(x.athlete.displayName), last: norm(x.athlete.lastName), starter: !!x.starter }));
+        }
+      } catch (err) { /* summary not ready yet */ }
+    }
+    byTeam[m.home] = byTeam[m.away] = m;
+  }));
+  const ms = Object.values(byTeam).filter((m, i, a) => a.indexOf(m) === i);
+  if (!ms.length) return false;
+  DATA.matches = ms.map(m => ({ kickoff: m.kickoff, home: m.home, away: m.away, status: m.status, lineups: Object.keys(m.squads) }));
+  for (const p of DATA.players) {
+    const m = byTeam[p.team]; if (!m) continue;
+    p.kickoff = m.kickoff;
+    const s = lineupStatus(p.name, m.squads[p.team]);
+    if (s) p.lineup = s;
+  }
+  return true;
+}
+
+// ---------- model ----------
+let overrides = {}, oppRid = null, KEY = "";
+const fmtKo = iso => iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "no fixture";
+const locked = p => p.kickoff && new Date(p.kickoff).getTime() <= Date.now();
+const teamName = rid => (DATA.teams.find(t => t.rid === rid) || {}).name || "?";
+function persist() { store.set(KEY, { o: overrides, opp: oppRid }); }
+
+// Status: your override, else the confirmed lineup, else Sleeper injury.
+function status(p) {
+  if (overrides[p.pid]) return { s: overrides[p.pid], src: "you" };
+  if (p.lineup) return { s: p.lineup, src: "lineup" };
+  if (p.inj === "Out" || p.inj === "Suspended" || p.ir) return { s: "out", src: "injury" };
+  return { s: null, src: null };
+}
+const rate90 = p => p.emin >= 5 ? p.proj / p.emin * 90 : (p.p90 || 0);
+function proj(p) {
+  const { s } = status(p);
+  if (s === "out") return 0;
+  if (s === "start") return rate90(p) * (p.pos === "GK" ? 90 : 78) / 90;
+  if (s === "bench") return rate90(p) * 10 / 90;
+  return p.proj;
+}
+function perms(a) { return a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r])); }
+function bestLineup(rid) {
+  const pool = DATA.players.filter(p => p.rid === rid && !p.ir).map(p => ({ p, v: proj(p) }));
+  let best = { total: -1, lineup: [] };
+  for (const order of perms(Object.keys(DATA.flex))) {
+    const used = new Set(), lineup = []; let total = 0;
+    for (const [slot, n] of Object.entries(DATA.slots)) {
+      pool.filter(x => x.p.pos === slot && !used.has(x.p.pid)).sort((a, b) => b.v - a.v).slice(0, n)
+        .forEach(x => { used.add(x.p.pid); lineup.push({ slot, ...x }); total += x.v; });
+    }
+    for (const slot of order) {
+      const c = pool.filter(x => !used.has(x.p.pid) && DATA.flex[slot].includes(x.p.pos)).sort((a, b) => b.v - a.v)[0];
+      if (c) { used.add(c.p.pid); lineup.push({ slot, ...c }); total += c.v; }
+    }
+    if (total > best.total) best = { total, lineup };
+  }
+  const order = [...Object.keys(DATA.slots), ...Object.keys(DATA.flex)];
+  best.lineup.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
+  return best;
+}
+function ncdf(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)); const d = 0.3989423 * Math.exp(-x * x / 2);
+  const q = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - q : q; }
+
+// ---------- view ----------
+function chip(p) {
+  const { s, src } = status(p);
+  if (s === "start") return `<span class="chip start">${src === "you" ? "Starting (you)" : "Starting"}</span>`;
+  if (s === "bench") return `<span class="chip bench">On bench</span>`;
+  if (s === "out") return `<span class="chip out">${src === "lineup" ? "Not in squad" : src === "you" ? "Out (you)" : p.ir ? "IR" : esc(p.inj || "Out")}</span>`;
+  if (p.inj) return `<span class="chip gtd">${esc(p.inj)}</span>`;
+  return `<span class="chip">Expected ${Math.round(p.emin)}′</span>`;
+}
+const SLOTNAME = { FM_FLEX: ["Flex", "F/M"], MD_FLEX: ["Flex", "M/D"], FMD_FLEX: ["Flex", "F/M/D"] };
+function rowHtml(x, slot, editable, bench) {
+  const p = x.p, v = x.v;
+  const sl = SLOTNAME[slot] ? `${SLOTNAME[slot][0]}<small>${SLOTNAME[slot][1]}</small>` : slot ? `${slot}<small>&nbsp;</small>` : `${p.pos}<small>bench</small>`;
+  const venue = p.home == null ? "" : p.home ? "home" : "away";
+  const cs = p.pcs != null ? ` · CS ${Math.round(p.pcs * 100)}%` : "";
+  const o = overrides[p.pid] || "";
+  const btn = editable ? `<button class="tog" type="button" data-pid="${p.pid}" data-o="${o}" aria-label="Change status for ${esc(p.name)}">${o === "start" ? "Starting" : o === "out" ? "Out" : "Auto"}</button>` : "";
+  return `<div class="row${bench ? " benchrow" : ""}${locked(p) ? " locked" : ""}">
+    <div class="slot">${sl}</div>
+    <div class="who"><span class="pname">${locked(p) ? "🔒 " : ""}${esc(p.name)}</span>
+      <span class="sub"><span>${p.pos} · ${esc(p.team || "—")} v ${esc(p.opp || "—")} ${venue}${cs}</span><span>${fmtKo(p.kickoff)}</span>${chip(p)}</span></div>
+    <div class="right"><span class="pp num">${v.toFixed(1)}</span>${btn}</div></div>`;
+}
+function baselineStarters(rid) {
+  // The plan before any lineup news or your overrides, to call out swaps.
+  const keepO = overrides, keepL = DATA.players.map(p => p.lineup);
+  overrides = {}; DATA.players.forEach(p => p.lineup = null);
+  const b = bestLineup(rid);
+  overrides = keepO; DATA.players.forEach((p, i) => p.lineup = keepL[i]);
+  return new Set(b.lineup.map(x => x.p.pid));
+}
+const chipText = p => { const s = status(p).s; return s === "bench" ? "on the bench" : s === "out" ? "not playing" : "lower projection"; };
+
+function render() {
+  const mine = bestLineup(DATA.me), theirs = bestLineup(oppRid);
+  const pw = ncdf((mine.total - theirs.total) / (DATA.playerSd * Math.sqrt(mine.lineup.length + theirs.lineup.length)));
+  $("mw").textContent = `Matchweek ${DATA.week}`;
+  $("myname").textContent = teamName(DATA.me);
+  $("mypts").textContent = mine.total.toFixed(1);
+  $("oppts").textContent = theirs.total.toFixed(1);
+  $("winp").textContent = Math.round(pw * 100) + "%";
+  $("winfill").style.width = (pw * 100).toFixed(0) + "%";
+  const known = DATA.matches.filter(m => m.lineups.length).length;
+  $("lineupsKnown").innerHTML = `Lineups out <b>${known}/${DATA.matches.length}</b>`;
+  $("sleeperNote").textContent = DATA.sleeperLive ? "Model + Sleeper" : "Model only (Sleeper not posted yet)";
+
+  $("xi").innerHTML = mine.lineup.map(x => rowHtml(x, x.slot, true)).join("");
+  const starters = new Set(mine.lineup.map(x => x.p.pid));
+  const bench = DATA.players.filter(p => p.rid === DATA.me && !starters.has(p.pid)).sort((a, b) => proj(b) - proj(a));
+  $("bench").innerHTML = bench.map(p => rowHtml({ p, v: proj(p) }, null, true, true)).join("");
+  $("oppTitle").textContent = `${teamName(oppRid)} XI`;
+  $("oppxi").innerHTML = theirs.lineup.map(x => rowHtml(x, x.slot, false)).join("");
+
+  const base = baselineStarters(DATA.me);
+  const ins = mine.lineup.filter(x => !base.has(x.p.pid)).map(x => x.p);
+  const outs = DATA.players.filter(p => base.has(p.pid) && !starters.has(p.pid));
+  const ch = $("changes");
+  ch.hidden = !(ins.length || outs.length);
+  if (!ch.hidden) ch.innerHTML = `<strong>Lineup change from the pre-lineup plan</strong>
+    <span>Start ${ins.map(p => `<b>${esc(p.name)}</b>`).join(", ") || "nobody new"} instead of ${outs.map(p => `<b>${esc(p.name)}</b> (${chipText(p)})`).join(", ")}.</span>`;
+
+  $("kos").innerHTML = DATA.matches.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff)).map(m =>
+    `<div class="ko"><span class="num">${fmtKo(m.kickoff)}</span><span>${esc(m.home)} v ${esc(m.away)}</span>
+     <span class="chip ${m.lineups.length ? "start" : ""}">${m.lineups.length ? "Lineups out" : "Lineups ~1h before"}</span></div>`).join("");
+  $("foot").textContent = `Projections from ${new Date(DATA.generated).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+}
+
+async function refreshLineups() {
+  $("liveMsg").textContent = "Checking ESPN for lineups…";
+  try {
+    await liveLineups();
+    $("liveMsg").textContent = "Lineups checked " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("liveRow").hidden = false;
+    render();
+  } catch (e) {
+    // Blocked (inside the Claude artifact viewer) or offline: keep the lineups baked into the data.
+    $("liveRow").hidden = !location.hostname.endsWith("github.io");
+    $("liveMsg").textContent = "Couldn't reach ESPN. Showing lineups as of the last data update.";
+  }
+}
+
+function start() {
+  KEY = "md-" + DATA.week;
+  const saved = store.get(KEY, {});
+  overrides = saved.o || {};
+  oppRid = saved.opp || DATA.opp || DATA.teams.find(t => t.rid !== DATA.me).rid;
+  $("unlock").hidden = true;
+  $("scoreCard").hidden = false;
+  document.querySelectorAll(".main").forEach(el => el.hidden = false);
+  const sel = $("opp");
+  sel.innerHTML = DATA.teams.filter(t => t.rid !== DATA.me).map(t => `<option value="${t.rid}">${esc(t.name)}</option>`).join("");
+  sel.value = String(oppRid);
+  render();
+  refreshLineups();
+  setInterval(refreshLineups, 3 * 60000);
+}
+
+$("opp").addEventListener("change", e => { oppRid = Number(e.target.value); persist(); render(); });
+$("refresh").addEventListener("click", refreshLineups);
+document.addEventListener("click", e => {
+  const b = e.target.closest("button.tog[data-pid]"); if (!b) return;
+  const pid = b.dataset.pid, cur = overrides[pid] || "";
+  const next = cur === "" ? "start" : cur === "start" ? "out" : "";
+  if (next) overrides[pid] = next; else delete overrides[pid];
+  persist(); render();
+});
+$("unlock").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("unlockMsg").textContent = "Unlocking…";
+  try {
+    DATA = await loadEncrypted($("pass").value);
+    store.set("md.pass", $("pass").value);
+    start();
+  } catch (err) { $("unlockMsg").textContent = err.message; }
+});
+
+(async () => {
+  if (DATA) return start();
+  const pass = store.get("md.pass", null);
+  if (pass) {
+    try { DATA = await loadEncrypted(pass); return start(); }
+    catch (err) { $("unlockMsg").textContent = err.message; }
+  }
+  $("unlock").hidden = false;
+})();
+</script>

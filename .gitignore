@@ -1,0 +1,4 @@
+engine/data/raw/
+engine/out/
+engine/.venv/
+__pycache__/

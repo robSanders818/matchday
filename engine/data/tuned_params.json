@@ -1,0 +1,32 @@
+{
+ "params": {
+  "decay": 0.9,
+  "prior_min": 600,
+  "min_decay": 0.7,
+  "min_window": 10,
+  "team_prior": 16,
+  "elast_scale": 1.0,
+  "home_att": 0.15,
+  "home_def": 0.0,
+  "xg_share": 0.5
+ },
+ "model_share": {
+  "D": 0.5,
+  "F": 0.5,
+  "GK": 0.5,
+  "M": 0.5
+ },
+ "tuned_on": "2025 weeks 6-38",
+ "validation": {
+  "sleeper": 0.5418900765029331,
+  "old_final": 0.5520496406249744,
+  "new_final": 0.5490816221849842
+ },
+ "calibration": {
+  "F": 1.225,
+  "M": 1.202,
+  "D": 1.254,
+  "GK": 1.064
+ },
+ "calibration_note": "actual/projected mean by position, avg of 2025-26 wk6-38 and 2026-27 wk3-8; applied to final blended projection"
+}

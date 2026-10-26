@@ -1,0 +1,47 @@
+# Recomputes the matchday projections and republishes the encrypted data file.
+# Runs early Friday/Saturday/Sunday mornings, before the first kickoffs; also "Run workflow" by hand
+# in the GitHub app (e.g. for midweek matchweeks). GitHub schedules are in UTC with no daylight saving,
+# so it runs at 09:07 and 10:07 UTC: that covers 5am Eastern in both summer (EDT) and winter (EST),
+# with a harmless second run at 6am or 4am.
+name: Update matchday
+on:
+  schedule:
+    - cron: "7 9 * * 5,6,0"   # Fri/Sat/Sun 5:07am EDT / 4:07am EST
+    - cron: "7 10 * * 5,6,0"  # Fri/Sat/Sun 6:07am EDT / 5:07am EST
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: matchday
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Restore downloaded stats
+        uses: actions/cache@v4
+        with:
+          path: engine/data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+      - name: Install
+        run: uv venv --python 3.13 && uv pip install -r requirements.txt
+      - name: Download league, stats, fixtures, injuries
+        env:
+          SLEEPER_LEAGUE_ID: ${{ secrets.SLEEPER_LEAGUE_ID }}
+        run: .venv/bin/python fetch_sleeper.py --players && .venv/bin/python fetch_history.py
+      - name: Build and encrypt
+        env:
+          MATCHDAY_PASSPHRASE: ${{ secrets.MATCHDAY_PASSPHRASE }}
+        run: .venv/bin/python publish_pages.py --no-fetch
+      - name: Commit
+        working-directory: .
+        run: |
+          git config user.name "matchday-bot"
+          git config user.email "matchday-bot@users.noreply.github.com"
+          git add index.html data/matchday.drs
+          git diff --cached --quiet || (git commit -m "Matchday data $(date -u +%Y-%m-%dT%H:%MZ)" && git push)
