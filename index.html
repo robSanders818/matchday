@@ -123,11 +123,12 @@ button.primary { font-size: 15px; padding: 10px 12px; background: var(--claret);
   </section>
 
   <div class="alert" id="changes" hidden></div>
+  <div class="alert" id="savedCheck" hidden></div>
 
   <section class="sec main" hidden>
     <h2>Your XI</h2>
     <div class="sheet" id="xi"></div>
-    <p class="help">Tap the button on a player to cycle <b>Auto</b> → <b>Starting</b> → <b>Out</b>. The lineup and win chance update right away. A lock means that game has kicked off and Sleeper has locked it.</p>
+    <p class="help">Tap the button on a player to cycle <b>Auto</b> → <b>Starting</b> → <b>Out</b>. The lineup and win chance update right away. A lock means that game has kicked off and Sleeper has locked it. Dual-position players show both positions under the slot they fill.</p>
   </section>
 
   <section class="sec main" hidden>
@@ -250,26 +251,40 @@ function proj(p) {
   if (s === "bench") return rate90(p) * 10 / 90;
   return p.proj;
 }
-function perms(a) { return a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r])); }
+// Best goalkeeper + best formation/assignment of outfielders by eligibility (exact DP over position counts).
+const OUTFIELD = ["D", "M", "F"];
+const elig = p => (p.elig && p.elig.length ? p.elig : [p.pos]);
 function bestLineup(rid) {
   const pool = DATA.players.filter(p => p.rid === rid && !p.ir).map(p => ({ p, v: proj(p) }));
-  let best = { total: -1, lineup: [] };
-  for (const order of perms(Object.keys(DATA.flex))) {
-    const used = new Set(), lineup = []; let total = 0;
-    for (const [slot, n] of Object.entries(DATA.slots)) {
-      pool.filter(x => x.p.pos === slot && !used.has(x.p.pid)).sort((a, b) => b.v - a.v).slice(0, n)
-        .forEach(x => { used.add(x.p.pid); lineup.push({ slot, ...x }); total += x.v; });
+  const gk = pool.filter(x => elig(x.p).includes("GK")).sort((a, b) => b.v - a.v)[0];
+  const cap = [0, 1, 2].map(i => Math.max(...DATA.formations.map(f => f[i])));
+  let dp = new Map([["0,0,0", { t: 0, lu: [] }]]);
+  for (const x of pool) {
+    const el = elig(x.p).map(e => OUTFIELD.indexOf(e)).filter(i => i >= 0);
+    if (!el.length) continue;
+    const nxt = new Map(dp);
+    for (const [k, c] of dp) {
+      const st = k.split(",").map(Number);
+      for (const i of el) {
+        if (st[i] >= cap[i]) continue;
+        const ns = st.slice(); ns[i]++;
+        const key = ns.join(","), cand = { t: c.t + x.v, lu: [...c.lu, { slot: OUTFIELD[i], ...x }] };
+        if (!nxt.has(key) || cand.t > nxt.get(key).t) nxt.set(key, cand);
+      }
     }
-    for (const slot of order) {
-      const c = pool.filter(x => !used.has(x.p.pid) && DATA.flex[slot].includes(x.p.pos)).sort((a, b) => b.v - a.v)[0];
-      if (c) { used.add(c.p.pid); lineup.push({ slot, ...c }); total += c.v; }
-    }
-    if (total > best.total) best = { total, lineup };
+    dp = nxt;
   }
-  const order = [...Object.keys(DATA.slots), ...Object.keys(DATA.flex)];
-  best.lineup.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
-  return best;
+  let best = { t: -1e9, lu: [] };
+  for (const f of DATA.formations) for (const [k, c] of dp) {
+    const st = k.split(",").map(Number);
+    if (st.every((n, i) => n <= f[i]) && c.t > best.t) best = c;
+  }
+  const lineup = best.lu.slice().sort((a, b) => OUTFIELD.indexOf(a.slot) - OUTFIELD.indexOf(b.slot) || b.v - a.v);
+  let total = best.t;
+  if (gk) { lineup.unshift({ slot: "GK", ...gk }); total += gk.v; }
+  return { total, lineup };
 }
+const formationOf = lineup => OUTFIELD.map(pos => lineup.filter(x => x.slot === pos).length).join("-");
 function ncdf(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)); const d = 0.3989423 * Math.exp(-x * x / 2);
   const q = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - q : q; }
 
@@ -282,10 +297,10 @@ function chip(p) {
   if (p.inj) return `<span class="chip gtd">${esc(p.inj)}</span>`;
   return `<span class="chip">Expected ${Math.round(p.emin)}′</span>`;
 }
-const SLOTNAME = { FM_FLEX: ["Flex", "F/M"], MD_FLEX: ["Flex", "M/D"], FMD_FLEX: ["Flex", "F/M/D"] };
 function rowHtml(x, slot, editable, bench) {
   const p = x.p, v = x.v;
-  const sl = SLOTNAME[slot] ? `${SLOTNAME[slot][0]}<small>${SLOTNAME[slot][1]}</small>` : slot ? `${slot}<small>&nbsp;</small>` : `${p.pos}<small>bench</small>`;
+  const dual = elig(p).length > 1 ? elig(p).join("/") : "";
+  const sl = slot ? `${slot}<small>${dual || "&nbsp;"}</small>` : `${elig(p).join("/")}<small>bench</small>`;
   const venue = p.home == null ? "" : p.home ? "home" : "away";
   const cs = p.pcs != null ? ` · CS ${Math.round(p.pcs * 100)}%` : "";
   const o = overrides[p.pid] || "";
@@ -293,7 +308,7 @@ function rowHtml(x, slot, editable, bench) {
   return `<div class="row${bench ? " benchrow" : ""}${locked(p) ? " locked" : ""}">
     <div class="slot">${sl}</div>
     <div class="who"><span class="pname">${locked(p) ? "🔒 " : ""}${esc(p.name)}</span>
-      <span class="sub"><span>${p.pos} · ${esc(p.team || "—")} v ${esc(p.opp || "—")} ${venue}${cs}</span><span>${fmtKo(p.kickoff)}</span>${chip(p)}</span></div>
+      <span class="sub"><span>${esc(p.team || "—")} v ${esc(p.opp || "—")} ${venue}${cs}</span><span>${fmtKo(p.kickoff)}</span>${chip(p)}</span></div>
     <div class="right"><span class="pp num">${v.toFixed(1)}</span>${btn}</div></div>`;
 }
 function baselineStarters(rid) {
@@ -309,7 +324,7 @@ const chipText = p => { const s = status(p).s; return s === "bench" ? "on the be
 function render() {
   const mine = bestLineup(DATA.me), theirs = bestLineup(oppRid);
   const pw = ncdf((mine.total - theirs.total) / (DATA.playerSd * Math.sqrt(mine.lineup.length + theirs.lineup.length)));
-  $("mw").textContent = `Matchweek ${DATA.week}`;
+  $("mw").textContent = `Matchweek ${DATA.week} · ${formationOf(mine.lineup)}`;
   $("myname").textContent = teamName(DATA.me);
   $("mypts").textContent = mine.total.toFixed(1);
   $("oppts").textContent = theirs.total.toFixed(1);
@@ -323,7 +338,7 @@ function render() {
   const starters = new Set(mine.lineup.map(x => x.p.pid));
   const bench = DATA.players.filter(p => p.rid === DATA.me && !starters.has(p.pid)).sort((a, b) => proj(b) - proj(a));
   $("bench").innerHTML = bench.map(p => rowHtml({ p, v: proj(p) }, null, true, true)).join("");
-  $("oppTitle").textContent = `${teamName(oppRid)} XI`;
+  $("oppTitle").textContent = `${teamName(oppRid)} XI · ${formationOf(theirs.lineup)}`;
   $("oppxi").innerHTML = theirs.lineup.map(x => rowHtml(x, x.slot, false)).join("");
 
   const base = baselineStarters(DATA.me);
@@ -333,6 +348,19 @@ function render() {
   ch.hidden = !(ins.length || outs.length);
   if (!ch.hidden) ch.innerHTML = `<strong>Lineup change from the pre-lineup plan</strong>
     <span>Start ${ins.map(p => `<b>${esc(p.name)}</b>`).join(", ") || "nobody new"} instead of ${outs.map(p => `<b>${esc(p.name)}</b> (${chipText(p)})`).join(", ")}.</span>`;
+
+  const saved = DATA.myStarters || [], empty = saved.filter(x => !x || x === "0").length;
+  const byPid = Object.fromEntries(DATA.players.map(p => [p.pid, p]));
+  const savedSet = new Set(saved);
+  const toBench = saved.filter(x => byPid[x] && !starters.has(x)).map(x => byPid[x]);
+  const toStart = mine.lineup.filter(x => !savedSet.has(x.p.pid)).map(x => x.p);
+  const sv = $("savedCheck");
+  sv.hidden = !(empty || toBench.length || toStart.length);
+  if (!sv.hidden) sv.innerHTML = `<strong>To match this in Sleeper</strong>
+    ${empty ? `<span>Your saved lineup has <b>${empty} empty slot${empty > 1 ? "s" : ""}</b>.</span>` : ""}
+    ${toStart.length ? `<span>Start ${toStart.map(p => `<b>${esc(p.name)}</b>`).join(", ")}.</span>` : ""}
+    ${toBench.length ? `<span>Bench ${toBench.map(p => `<b>${esc(p.name)}</b>`).join(", ")}.</span>` : ""}
+    <span class="foot">Use a ${formationOf(mine.lineup)}. Saved lineup as of the last data update; ignore this once you've made the moves.</span>`;
 
   $("kos").innerHTML = DATA.matches.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff)).map(m =>
     `<div class="ko"><span class="num">${fmtKo(m.kickoff)}</span><span>${esc(m.home)} v ${esc(m.away)}</span>

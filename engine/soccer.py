@@ -12,7 +12,6 @@ Run `uv run fetch_sleeper.py` first each week for fresh stats.
 
 import argparse
 from functools import lru_cache
-from itertools import permutations
 
 import numpy as np
 import pandas as pd
@@ -21,8 +20,10 @@ from scipy.special import ndtr
 import core
 import model
 
-SLOTS = {"F": 1, "M": 3, "D": 3, "GK": 1}
-FLEX = {"FM_FLEX": ("F", "M"), "MD_FLEX": ("M", "D"), "FMD_FLEX": ("F", "M", "D")}
+# Sleeper soccer lineups: a goalkeeper plus 10 outfielders in one of these formations (D-M-F).
+# A player can fill any position he's eligible for (e.g. Okafor F or M); he's scored the same either way.
+FORMATIONS = [(3, 4, 3), (3, 5, 2), (4, 3, 3), (4, 4, 2), (4, 5, 1), (5, 3, 2), (5, 4, 1)]
+OUTFIELD = ("D", "M", "F")
 ROS_WEEKS = 5
 PLAYER_SD = 6.0        # typical miss on one player's matchweek score (backtest MAE ~5.3)
 
@@ -36,23 +37,46 @@ def weeks_ahead(n=ROS_WEEKS):
     return list(range(core.DONE + 1, min(core.DONE + 1 + n, 39)))
 
 
+def eligible(pid) -> list[str]:
+    fp = [x for x in (core.players().get(str(pid), {}).get("fantasy_positions") or []) if x in core.POSITIONS]
+    return fp or [core.ppos(pid)]
+
+
 def best_lineup(pids: list[str], p: pd.DataFrame) -> tuple[float, list[tuple[str, str]]]:
-    """Optimal starters (slot, pid) for one matchweek. Fixed slots first, then flex in the best order."""
-    pool = {pid: (p.at[pid, "proj"] if pid in p.index else 0.0, core.ppos(pid)) for pid in pids}
-    best = (-1.0, [])
-    for order in permutations(FLEX):
-        used, lineup, total = set(), [], 0.0
-        for slot, n in SLOTS.items():
-            for pid in sorted((x for x in pool if pool[x][1] == slot and x not in used), key=lambda x: -pool[x][0])[:n]:
-                used.add(pid); lineup.append((slot, pid)); total += pool[pid][0]
-        for slot in order:
-            c = [x for x in pool if x not in used and pool[x][1] in FLEX[slot]]
-            if c:
-                pid = max(c, key=lambda x: pool[x][0])
-                used.add(pid); lineup.append((slot, pid)); total += pool[pid][0]
-        if total > best[0]:
-            best = (total, lineup)
-    return best
+    """Optimal starters [(position, pid)] for one matchweek: best goalkeeper, then the best
+    formation and assignment of outfielders by eligibility (exact, small DP over position counts)."""
+    val = {pid: float(p.at[pid, "proj"]) if pid in p.index else 0.0 for pid in dict.fromkeys(pids)}
+    gks = sorted((x for x in val if "GK" in eligible(x)), key=lambda x: -val[x])
+    cap = tuple(max(f[i] for f in FORMATIONS) for i in range(3))
+    dp = {(0, 0, 0): (0.0, ())}
+    for pid in val:
+        el = [OUTFIELD.index(e) for e in eligible(pid) if e in OUTFIELD]
+        if not el:
+            continue
+        nxt = dict(dp)
+        for state, (tot, lu) in dp.items():
+            for i in el:
+                if state[i] < cap[i]:
+                    st = tuple(c + (j == i) for j, c in enumerate(state))
+                    cand = (tot + val[pid], lu + ((OUTFIELD[i], pid),))
+                    if st not in nxt or cand[0] > nxt[st][0]:
+                        nxt[st] = cand
+        dp = nxt
+    best = (-1e9, ())
+    for f in FORMATIONS:
+        for st, cand in dp.items():
+            if all(st[i] <= f[i] for i in range(3)) and cand[0] > best[0]:
+                best = cand
+    total, lineup = best
+    lineup = sorted(lineup, key=lambda x: (OUTFIELD.index(x[0]), -val[x[1]]))
+    if gks:
+        total += val[gks[0]]
+        lineup = [("GK", gks[0])] + lineup
+    return total, lineup
+
+
+def formation(lineup) -> str:
+    return "-".join(str(sum(1 for s, _ in lineup if s == pos)) for pos in OUTFIELD)
 
 
 def label(pid, p):
@@ -77,22 +101,22 @@ def cmd_week(a):
     me = core.my_roster_id()
     mine = R[me]["players"]
     total, lineup = best_lineup(mine, p)
-    print(f"Matchweek {week}: {R[me]['team']} — projected {total:.1f} pts"
+    print(f"Matchweek {week}: {R[me]['team']} — projected {total:.1f} pts in a {formation(lineup)}"
           + ("" if p.attrs.get("sleeper_live") else "   (Sleeper hasn't posted real projections for this week yet: model only)"))
     for slot, pid in lineup:
-        print(f"  {slot:<9}{label(pid, p)}")
+        print(f"  {slot:<4}{label(pid, p)}")
     starters = {pid for _, pid in lineup}
     print("  Bench:")
     for pid in sorted((x for x in mine if x not in starters), key=lambda x: -(p.at[x, "proj"] if x in p.index else 0)):
-        print(f"           {label(pid, p)}")
+        print(f"      {label(pid, p)}")
     a.opp = a.opp or core.scheduled_opp(week)
     if a.opp:
         ot, ol = best_lineup(R[a.opp]["players"], p)
         sd = PLAYER_SD * np.sqrt(len(lineup) + len(ol))
         pw = float(ndtr((total - ot) / sd))
-        print(f"\nVs {R[a.opp]['team']}: their best lineup {ot:.1f} pts -> your win chance {pw:.0%} (margin {total - ot:+.1f})")
+        print(f"\nVs {R[a.opp]['team']}: their best lineup ({formation(ol)}) {ot:.1f} pts -> your win chance {pw:.0%} (margin {total - ot:+.1f})")
         for slot, pid in ol:
-            print(f"  {slot:<9}{label(pid, p)}")
+            print(f"  {slot:<4}{label(pid, p)}")
 
 
 def rostered() -> set:
@@ -148,13 +172,16 @@ def cmd_values(a):
     tn = core.team_names()
     print(f"{R[rid]['team']} — rest-of-season value (avg next {ROS_WEEKS} MWs, vs best free agents at the position)")
     print(f"  replacement level: " + "  ".join(f"{k} {v:.1f}" for k, v in rep.items()))
+    print("  value = ROS minus the best free agent he could be swapped for; dual-position players")
+    print("  count against the weaker position (and are scored at their listed position wherever they play).")
     rows = []
     for pid in dict.fromkeys(R[rid]["players"] + R[rid]["reserve"]):  # reserve players are also listed in players
         if pid in t.index:
             r = t.loc[pid]
-            rows.append((r.ros - rep.get(r.pos, 0), r))
-    for v, r in sorted(rows, key=lambda x: -x[0]):
-        print(f"  {r['name']:<24}{r.pos:<3}{tn.get(r.team, r.team):>4}  ROS {r.ros:5.1f}  next {r.next:5.1f}  value {v:+5.1f}  ({r.e_min:3.0f} min)")
+            el = [e for e in eligible(pid) if e in rep]
+            rows.append((r.ros - min(rep[e] for e in el), r, "/".join(el)))
+    for v, r, el in sorted(rows, key=lambda x: -x[0]):
+        print(f"  {r['name']:<24}{el:<5}{tn.get(r.team, r.team):>4}  ROS {r.ros:5.1f}  next {r.next:5.1f}  value {v:+5.1f}  ({r.e_min:3.0f} min)")
 
 
 def team_ros(pids) -> float:

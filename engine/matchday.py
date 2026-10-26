@@ -106,7 +106,7 @@ def build(week: int, opp: int | None) -> dict:
             team = tn.get(str(r.team), "") if r is not None else info.get("team_abbr", "")
             m = by_team.get(team)
             players.append({
-                "pid": pid, "rid": rid, "name": core.pname(pid), "pos": core.ppos(pid), "team": team,
+                "pid": pid, "rid": rid, "name": core.pname(pid), "pos": core.ppos(pid), "elig": soccer.eligible(pid), "team": team,
                 "opp": tn.get(str(r.opp), "") if r is not None else "",
                 "home": None if r is None or pd.isna(r.home) else bool(r.home),
                 "proj": round(float(r.proj), 2) if r is not None else 0.0,
@@ -121,7 +121,9 @@ def build(week: int, opp: int | None) -> dict:
         "week": week, "generated": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "sleeperLive": bool(p.attrs.get("sleeper_live")), "me": core.my_roster_id(), "opp": opp,
         "teams": [{"rid": rid, "name": v["team"], "owner": v["owner"], "record": v["record"]} for rid, v in R.items()],
-        "slots": soccer.SLOTS, "flex": {k: list(v) for k, v in soccer.FLEX.items()}, "playerSd": soccer.PLAYER_SD,
+        "formations": soccer.FORMATIONS, "playerSd": soccer.PLAYER_SD,
+        # Your lineup as saved in Sleeper right now ("0" = empty slot).
+        "myStarters": next((r.get("starters") or [] for r in core.load("rosters.json") if r["roster_id"] == core.my_roster_id()), []),
         "matches": [{k: m[k] for k in ("kickoff", "home", "away", "status")} | {"lineups": sorted(m["lineups"])} for m in matches],
         "players": players,
     }
@@ -141,13 +143,18 @@ def report(data: dict, out) -> None:
     by = {p["pid"]: p for p in me}
     total, lineup = soccer.best_lineup(list(df.index), df)
     xi = [pid for _, pid in lineup]
-    print(f"Recommended XI ({total:.1f} pts):")
+    print(f"Recommended XI ({soccer.formation(lineup)}, {total:.1f} pts):")
     for slot, pid in lineup:
         p = by[pid]
-        print(f"  {slot:<9}{p['name']:<24}{p['team']:>4} v {p['opp']:<4} {df.at[pid, 'proj']:5.1f}  {p['lineup'] or 'lineup not out'}")
+        print(f"  {slot:<4}{p['name']:<24}{p['team']:>4} v {p['opp']:<4} {df.at[pid, 'proj']:5.1f}  {p['lineup'] or 'lineup not out'}")
     flagged = [p for p in me if p["pid"] in xi and p["lineup"] in ("bench", "out")]
     for p in flagged:
         print(f"  !! {p['name']} is {'on the bench' if p['lineup'] == 'bench' else 'not in the squad'} but still the best option")
+    saved = data["myStarters"]
+    empty = sum(1 for x in saved if x in ("0", "", None))
+    dead = [by[x]["name"] for x in saved if x in by and adjusted(by[x]) == 0]
+    if empty or dead:
+        print(f"  !! Your saved Sleeper lineup has {empty} empty slot(s)" + (f" and starts {', '.join(dead)} (not playing)" if dead else ""))
     last = out / "last_xi.json"
     prev = json.loads(last.read_text()) if last.exists() else {}
     if prev.get("week") == data["week"]:
